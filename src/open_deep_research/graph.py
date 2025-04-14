@@ -1,3 +1,4 @@
+import os
 from google import genai
 from typing import Literal
 from langchain_community.document_loaders import PyPDFLoader
@@ -288,7 +289,7 @@ async def build_section_with_book_research(state: ReportState, config: RunnableC
     content = "\n\n".join([page.page_content for page in pages])
     
     client = genai.Client(
-        api_key="AIzaSyCIBAana0-CCDH3Go49S7V9tWGpp2UkH3Q",
+        api_key=os.environ.get("GOOGLE_GENAI_API_KEY"),
     )
 
   
