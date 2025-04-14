@@ -1,3 +1,17 @@
+research_book_instructions = """You are an expert researcher whose job is to research on a topic from the given pdfs .
+
+<Research Topic>
+{topic}
+</Research Topic>
+
+<Content of the PDFs>
+{pdfs}
+</Content of the PDFs>
+
+"""
+
+
+
 report_planner_query_writer_instructions="""You are performing research for a report. 
 
 <Report topic>
@@ -9,12 +23,11 @@ report_planner_query_writer_instructions="""You are performing research for a re
 </Report organization>
 
 <Task>
-Your goal is to generate {number_of_queries} web search queries that will help gather information for planning the report sections. 
+Your goal is to generate {number_of_queries} pubMed search queries that will help gather information for planning the report sections. 
 
 The queries should:
 
-1. Be related to the Report topic
-2. Help satisfy the requirements specified in the report organization
+1. Be related to the Report topic and make sure to explore more than enough literature
 
 Make the queries specific enough to find high-quality, relevant sources while covering the breadth needed for the report structure.
 </Task>
@@ -55,11 +68,12 @@ Each section should have the fields:
 
 - Name - Name for this section of the report.
 - Description - Brief overview of the main topics covered in this section.
-- Research - Whether to perform web research for this section of the report.
+- Research - Whether to perform Pubmed search for this section of the report.
 - Content - The content of the section, which you will leave blank for now.
 
 Integration guidelines:
 - Include examples and implementation details within main topic sections, not as separate sections
+- If topic can be researched more on pubmed, return true on research field for tht section
 - Ensure each section has a distinct purpose with no content overlap
 - Combine related concepts rather than separating them
 

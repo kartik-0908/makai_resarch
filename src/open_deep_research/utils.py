@@ -1156,7 +1156,7 @@ async def select_and_execute_search(search_api: str, query_list: list[str], para
         return deduplicate_and_format_sources(search_results, max_tokens_per_source=4000)
     elif search_api == "pubmed":
         search_results = await pubmed_search_async(query_list, **params_to_pass)
-        return deduplicate_and_format_sources(search_results, max_tokens_per_source=4000)
+        return deduplicate_and_format_sources(search_results, max_tokens_per_source=8000)
     elif search_api == "linkup":
         search_results = await linkup_search(query_list, **params_to_pass)
         return deduplicate_and_format_sources(search_results, max_tokens_per_source=4000)

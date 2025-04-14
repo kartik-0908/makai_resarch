@@ -1,5 +1,6 @@
+from google import genai
 from typing import Literal
-
+from langchain_community.document_loaders import PyPDFLoader
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_core.runnables import RunnableConfig
@@ -125,7 +126,7 @@ async def generate_report_plan(state: ReportState, config: RunnableConfig):
 
     return {"sections": sections}
 
-def human_feedback(state: ReportState, config: RunnableConfig) -> Command[Literal["generate_report_plan","build_section_with_web_research"]]:
+def human_feedback(state: ReportState, config: RunnableConfig) -> Command[Literal["generate_report_plan","build_section_with_web_research", "build_section_with_book_research"]]:
     """Get human feedback on the report plan and route to next steps.
     
     This node:
@@ -164,9 +165,13 @@ def human_feedback(state: ReportState, config: RunnableConfig) -> Command[Litera
     if isinstance(feedback, bool) and feedback is True:
         # Treat this as approve and kick off section writing
         return Command(goto=[
+            # Web research for sections that need it
             Send("build_section_with_web_research", {"topic": topic, "section": s, "search_iterations": 0}) 
             for s in sections 
             if s.research
+        ] + [
+            # Add book research as well
+            Send("build_section_with_book_research", {"topic": topic, "sections": sections})
         ])
     
     # If the user provides feedback, regenerate the report plan 
@@ -249,6 +254,66 @@ async def search_web(state: SectionState, config: RunnableConfig):
 
     return {"source_str": source_str, "search_iterations": state["search_iterations"] + 1}
 
+async def build_section_with_book_research(state: ReportState, config: RunnableConfig):
+    """Research text from a book related to the report topic and sections.
+    
+     This node:
+    1. Takes the report sections and topic
+    2. Processes attached PDFs
+    3. Uses Gemini to extract relevant content from PDFs
+    4. Returns structured book content to be incorporated into the report
+    
+    Args:
+        state: Current state containing report sections and topic
+        config: Configuration for the workflow including model settings
+        
+    Returns:
+        Dict with book research results
+    """
+    files = [
+        "/home/kartik/open_deep_research/pdf/Harrison's Cardiology (1).pdf",
+        "/home/kartik/open_deep_research/pdf/heidenreich-et-al-2022-2022-aha-acc-hfsa-guideline-for-the-management-of-heart-failure-a-report-of-the-american-college.pdf",
+        "/home/kartik/open_deep_research/pdf/usmle-step2-cardio_35-70.pdf",
+        "/home/kartik/open_deep_research/pdf/USMLE1cardio_304-349.pdf"
+    ]
+    pages = []
+    for file in files:
+        loader = PyPDFLoader(file)
+        async for page in loader.alazy_load():
+            pages.append(page)
+        
+    print(len(pages))
+    topic = state["topic"]
+    
+    content = "\n\n".join([page.page_content for page in pages])
+    
+    client = genai.Client(
+        api_key="AIzaSyCIBAana0-CCDH3Go49S7V9tWGpp2UkH3Q",
+    )
+
+  
+    model = "gemini-2.5-pro-preview-03-25"
+
+    response = client.models.generate_content(
+    model=model, contents=(f"""You are an expert researcher whose job is to research on a topic from the given pdfs .
+
+<Research Topic>
+{topic}
+</Research Topic>
+
+<Content of the PDFs>
+{content}
+</Content of the PDFs>
+
+Respond with the findings which might help doctor in solving this case, dont pass any judgement on any option , only search relevant content from the content given above
+""")
+)
+    
+    # Placeholder for your book research implementation
+    book_content = [{"section_name": "Findings from the book", "book_content": response.text}]
+    
+    return {"book_research_content": book_content}
+
 def write_section(state: SectionState, config: RunnableConfig) -> Command[Literal[END, "search_web"]]:
     """Write a section of the report and evaluate if more research is needed.
     
@@ -279,7 +344,7 @@ def write_section(state: SectionState, config: RunnableConfig) -> Command[Litera
     section_writer_inputs_formatted = section_writer_inputs.format(topic=topic, 
                                                              section_name=section.name, 
                                                              section_topic=section.description, 
-                                                             context=source_str, 
+                                                             context=source_str,
                                                              section_content=section.content)
 
     # Generate section  
@@ -392,6 +457,14 @@ def gather_completed_sections(state: ReportState):
 
     # Format completed section to str to use as context for final sections
     completed_report_sections = format_sections(completed_sections)
+    
+    book_content = ""
+    if "book_research_content" in state:
+        book_content = "\n\n".join([
+            f"### Book Research for {item['section_name']}:\n{item['book_content']}"
+            for item in state["book_research_content"]
+        ])
+        completed_report_sections += "\n\n## Book Research\n\n" + book_content
 
     return {"report_sections_from_research": completed_report_sections}
 
@@ -463,6 +536,7 @@ builder = StateGraph(ReportState, input=ReportStateInput, output=ReportStateOutp
 builder.add_node("generate_report_plan", generate_report_plan)
 builder.add_node("human_feedback", human_feedback)
 builder.add_node("build_section_with_web_research", section_builder.compile())
+builder.add_node("build_section_with_book_research", build_section_with_book_research)
 builder.add_node("gather_completed_sections", gather_completed_sections)
 builder.add_node("write_final_sections", write_final_sections)
 builder.add_node("compile_final_report", compile_final_report)
@@ -471,6 +545,7 @@ builder.add_node("compile_final_report", compile_final_report)
 builder.add_edge(START, "generate_report_plan")
 builder.add_edge("generate_report_plan", "human_feedback")
 builder.add_edge("build_section_with_web_research", "gather_completed_sections")
+builder.add_edge("build_section_with_book_research", "gather_completed_sections")
 builder.add_conditional_edges("gather_completed_sections", initiate_final_section_writing, ["write_final_sections"])
 builder.add_edge("write_final_sections", "compile_final_report")
 builder.add_edge("compile_final_report", END)

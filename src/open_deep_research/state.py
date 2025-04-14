@@ -29,6 +29,10 @@ class Queries(BaseModel):
         description="List of search queries.",
     )
 
+class BookResearchItem(BaseModel):
+    section_name: str = Field(description="Name of the section this book research is for.")
+    book_content: str = Field(description="Content from book research relevant to this section.")
+
 class Feedback(BaseModel):
     grade: Literal["pass","fail"] = Field(
         description="Evaluation result indicating whether the response meets requirements ('pass') or needs revision ('fail')."
@@ -48,13 +52,14 @@ class ReportState(TypedDict):
     feedback_on_report_plan: str # Feedback on the report plan
     sections: list[Section] # List of report sections 
     completed_sections: Annotated[list, operator.add] # Send() API key
+    book_research_content: list[BookResearchItem] # Results from book research
     report_sections_from_research: str # String of any completed sections from research to write final sections
     final_report: str # Final report
 
 class SectionState(TypedDict):
     topic: str # Report topic
     section: Section # Report section  
-    search_iterations: int # Number of search iterations done
+    search_iterations: Annotated[int, operator.add] # Send() API key
     search_queries: list[SearchQuery] # List of search queries
     source_str: str # String of formatted source content from web search
     report_sections_from_research: str # String of any completed sections from research to write final sections
@@ -62,3 +67,11 @@ class SectionState(TypedDict):
 
 class SectionOutputState(TypedDict):
     completed_sections: list[Section] # Final key we duplicate in outer state for Send() API
+
+class BookResearchState(TypedDict):
+    topic: str # Report topic
+    sections: list[Section] # List of sections to research in books
+    book_research_content: list[BookResearchItem] # Results from book research
+
+class BookResearchOutputState(TypedDict):
+    book_research_content: list[BookResearchItem] # Results to be added to the main state
